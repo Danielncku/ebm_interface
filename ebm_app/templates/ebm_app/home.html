@@ -1,0 +1,495 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>IDH_EBM模型病人特徵解釋系統</title>
+    <style>
+        /* 
+         * 全域預設：將所有元素的 margin / padding 歸零，
+         * 並啟用 border-box 方便計算寬高（含 border、padding）
+         */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* 
+         * body：整體字型、背景色、以及高度與捲動設定
+         * height: 100vh 讓主畫面剛好佔滿整個 viewport 高度
+         * overflow: hidden 避免整頁出現捲軸（內容只在內部區塊捲動）
+         */
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background-color: #F8F9FA;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 右上角 logo 區塊容器：固定在畫面右上角 */
+        .logo-container {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000; /* 確保浮在最上層 */
+            background: rgba(255, 255, 255, 0.98);
+            padding: 8px 15px;
+            border-radius: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: 1px solid #E0E0E0;
+        }
+
+        /* 右上角 logo 圖片：控制高度，使用 mix-blend-mode 讓底色融合 */
+        .logo-container img {
+            height: 35px;
+            mix-blend-mode: multiply;
+        }
+
+        /* 右上角「成大醫院」文字樣式 */
+        .logo-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #212121;
+        }
+ 
+        /* 頂部標題區：漸層背景與簡單陰影 */
+        .header {
+            background: linear-gradient(135deg, #90abf0ff 0%, #768ad9ff 100%);
+            color: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 8px rgba(58, 111, 247, 0.2);
+        }
+
+        /* 主標題樣式 */
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        /* 副標題樣式 */
+        .header p {
+            font-size: 1em;
+            opacity: 0.95;
+        }
+
+        /* 
+         * 主容器：左右分割的外框
+         * height: calc(100vh - 90px) 將 header 高度扣掉，讓內容剛好填滿剩餘空間
+         * gap: 區塊間距
+         */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 90px);
+            gap: 15px;
+            padding: 15px;
+        }
+
+        /* 
+         * 左邊區塊：全域解釋
+         * flex: 6 代表在 6:4 比例中的 6 份
+         */
+        .left-section {
+            flex: 6;
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #E8E8E8;
+        }
+
+        /*
+         * 右邊區塊：病人選單
+         * flex: 4 代表在 6:4 比例中的 4 份
+         */
+        .right-section {
+            flex: 4;
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #E8E8E8;
+        }
+
+        /* 各區標題（包含 icon 與文字） */
+        .section-title {
+            font-size: 1.5em;
+            color: #212121;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #5C7CFA;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        /* 病人選單標題底線顏色稍微不同，做視覺區隔 */
+        .section-title-patient {
+            border-bottom-color: #3A6FF7;
+        }
+
+        /* 外層控制 select 與 label 的區塊 */
+        .selector-group {
+            margin-bottom: 20px;
+        }
+
+        /* select 的標籤文字樣式 */
+        .selector-group label {
+            font-weight: 600;
+            color: #212121;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        /* 下拉式選單基本樣式 */
+        .selector-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 15px;
+            background: #FAFAFA;
+            transition: all 0.3s;
+            cursor: pointer;
+            color: #212121;
+        }
+
+        /* select 聚焦時的樣式：顏色加深＋外框陰影 */
+        .selector-group select:focus {
+            border-color: #3A6FF7;
+            outline: none;
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(58, 111, 247, 0.1);
+        }
+
+        /* 滑鼠 hover 時的 select 樣式 */
+        .selector-group select:hover {
+            border-color: #5C7CFA;
+            background: #FFFFFF;
+        }
+
+        /* 病人 selector 若有需要可在此加個別效果，目前僅保留給未來擴充用 */
+        .selector-group.patient-selector select:focus {
+            border-color: #3A6FF7;
+        }
+
+        /* 
+         * 查看病人 Dashboard 的按鈕：
+         * 使用漸層底色與 box-shadow 增加立體感
+         */
+        .view-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #3A6FF7 0%, #5C7CFA 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(58, 111, 247, 0.25);
+        }
+
+        /* 按鈕 hover 效果：微微上浮＋陰影加深＋顏色加深 */
+        .view-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(58, 111, 247, 0.35);
+            background: linear-gradient(135deg, #2E5FE6 0%, #4A6CE9 100%);
+        }
+
+        /* 按鈕 disable 狀態：灰色、無法點擊、沒動畫 */
+        .view-button:disabled {
+            background: #BDBDBD;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 
+         * 圖表容器：使用 flex:1 讓其撐滿剩餘高度
+         * min-height: 0 搭配 flex 排版，避免內容撐爆
+         */
+        .chart-container {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        /* 用 iframe 來嵌入 Plotly 產生的 HTML 圖表 */
+        .chart-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        /* 全域圖表載入中的樣式：置中 spinner + 文字 */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 1.1em;
+            color: #616161;
+        }
+
+        /* 載入時的圓形旋轉動畫 */
+        .spinner {
+            border: 4px solid #E3F2FD;
+            border-top: 4px solid #3A6FF7;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        /* 旋轉動畫 keyframes 定義 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 右側說明框：淡藍色漸層背景，左邊有一條深藍色邊線 */
+        .info-box {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            border-left: 4px solid #3A6FF7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: #1565C0;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: #0D47A1;
+        }
+
+        /* 顯示目前共有多少病人資料的小提示框 */
+        .patient-count {
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: #2E7D32;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            font-weight: 600;
+            border: 1px solid #A5D6A7;
+        }
+    </style>
+</head>
+<body>
+    <!-- 右上角 Logo 區塊 -->
+    <div class="logo-container">
+        <!-- 使用 Django static tag 載入成大醫院 logo 圖檔 -->
+        <img src="{% static 'image/ncku_hospital_logo.png' %}" alt="成大醫院圖標">
+        <span class="logo-text">成大醫院</span>
+    </div>
+    
+    <!-- 頁面上方標題列 -->
+    <div class="header">
+        <h1>🏥 EBM模型病人特徵解釋系統</h1>
+        <p>透析病人低血壓風險預測與特徵解釋</p>
+    </div>
+
+    <!-- 主容器 - 左右分割 6:4 -->
+    <div class="main-container">
+        <!-- 左半邊 - 全域解釋 -->
+        <div class="left-section">
+            <h2 class="section-title">
+                <span>🌍</span>
+                <span>全域特徵解釋</span>
+            </h2>
+
+            <!-- 特徵選擇下拉式選單：預設為「全部特徵」 -->
+            <div class="selector-group">
+                <label for="feature_select">選擇特徵：</label>
+                <select id="feature_select">
+                    <option value="">全部特徵</option>
+                    {% for feature in feature_cols %}
+                        <!-- value 以特徵名稱為主，後端 AJAX 會用來過濾 -->
+                        <option value="{{ feature }}">{{ feature }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 圖表顯示區：預設先顯示 loading，之後由 iframe 填入全域圖 -->
+            <div class="chart-container">
+                <!-- 載入中顯示：spinner + 文字 -->
+                <div class="loading" id="global_loading">
+                    <div class="spinner"></div>
+                    <div>載入全域解釋圖表中...</div>
+                </div>
+
+                <!-- 用 iframe 來承載後端回傳的 HTML 圖表 -->
+                <iframe id="global_iframe" class="chart-iframe" style="display: none;"></iframe>
+            </div>
+        </div>
+
+        <!-- 右半邊 - 病人選單與說明 -->
+        <div class="right-section">
+            <h2 class="section-title section-title-patient">
+                <span>👥</span>
+                <span>病人選單</span>
+            </h2>
+            
+            <!-- 顯示目前病人資料總數：patient_list 由 Django view 傳入 -->
+            <div class="patient-count">
+                共有 {{ patient_list|length }} 位病人資料
+            </div>
+
+            <!-- 病人下拉選單：選擇某一位病人 -->
+            <div class="selector-group patient-selector">
+                <label for="patient_select">選擇病人：</label>
+                <select id="patient_select">
+                    <option value="">請選擇病人...</option>
+                    {% for patient in patient_list %}
+                        <!-- option 顯示：病人 ID 前面加「病人」字樣 -->
+                        <option value="{{ patient }}">病人 {{ patient }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 查看病人詳細 Dashboard 的按鈕：預設 disabled，選到病人後才啟用 -->
+            <button id="view_dashboard" class="view-button" disabled>
+                查看病人詳細分析 →
+            </button>
+
+            <!-- 右側說明文字：簡單介紹系統功能 -->
+            <div class="info-box">
+                <p><strong>📊 系統功能說明：</strong></p>
+                <p>• 左側顯示模型的全域特徵重要性</p>
+                <p>• 選擇病人後可查看個別分析</p>
+                <p>• 點擊按鈕進入 Dashboard 查看區域解釋</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 記錄目前選擇的病人編號（從下拉選單取得）
+        let selectedPatient = null;
+
+        // ------------------------
+        // 全域解釋載入邏輯（首頁不顯示病人標記）
+        // ------------------------
+        /**
+         * 依照選擇的特徵(feature)載入全域解釋圖表
+         * @param {string} feature - 特徵名稱，空字串代表「全部特徵」
+         */
+        function loadGlobal(feature='') {
+            const loading = document.getElementById('global_loading'); // 載入中區塊
+            const iframe = document.getElementById('global_iframe');   // 承載圖表的 iframe
+            
+            // 切換顯示狀態：顯示 loading，隱藏 iframe
+            loading.style.display = 'flex';
+            iframe.style.display = 'none';
+
+            // 透過 AJAX 向後端請求全域解釋 HTML
+            // 注意：這個 endpoint 在後端 view 中要對應好
+            fetch(`/ajax/global_explanation/?feature=${encodeURIComponent(feature)}`)
+                .then(res => res.text())    // 將回傳內容視為純文字（HTML）
+                .then(html => {
+                    // 把 HTML 寫入 iframe 的 document 中
+                    iframe.contentWindow.document.open();
+                    iframe.contentWindow.document.write(html);
+                    iframe.contentWindow.document.close();
+                    
+                    // 載入完 HTML 後，切換顯示：隱藏 loading，顯示 iframe
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                    
+                    // 等待 iframe 完全載入後，呼叫 Plotly 的 resize 調整圖表大小
+                    iframe.onload = function() {
+                        try {
+                            const iframeWindow = iframe.contentWindow;
+                            // 確認 iframe 內有載入 Plotly（防止錯誤）
+                            if (iframeWindow.Plotly) {
+                                // 尋找所有圖表 div（通常 class 為 plotly-graph-div）
+                                const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                                plotDivs.forEach(div => {
+                                    iframeWindow.Plotly.Plots.resize(div);
+                                });
+                            }
+                        } catch (e) {
+                            console.log('無法調整 Plotly 圖表大小:', e);
+                        }
+                    };
+                })
+                .catch(error => {
+                    // 若載入失敗，顯示錯誤訊息
+                    console.error('載入全域解釋圖表失敗:', error);
+                    loading.innerHTML = '<div class="spinner"></div><div style="color: #F44336;">載入失敗，請稍後再試</div>';
+                });
+        }
+
+        // 監聽特徵下拉選單變化，一改變就重新載入全域解釋圖
+        document.getElementById('feature_select').addEventListener('change', (e) => {
+            loadGlobal(e.target.value); // 將選取的特徵名稱傳入 loadGlobal
+        });
+
+        // 病人選單變化：更新 selectedPatient 並控制按鈕 enable/disable
+        document.getElementById('patient_select').addEventListener('change', (e) => {
+            selectedPatient = e.target.value;
+            const button = document.getElementById('view_dashboard');
+            
+            if (selectedPatient) {
+                // 有選病人 → 啟用按鈕
+                button.disabled = false;
+            } else {
+                // 沒選病人 → 按鈕保持無法點擊
+                button.disabled = true;
+            }
+        });
+
+        // 點擊「查看 Dashboard」按鈕後，導向該病人的 Dashboard 頁面
+        document.getElementById('view_dashboard').addEventListener('click', () => {
+            if (selectedPatient) {
+                // 這裡假設後端 URL pattern 為 /dashboard/<patient_id>/
+                window.location.href = `/dashboard/${selectedPatient}/`;
+            }
+        });
+
+        // 視窗大小改變時，重新調整 iframe 裡 Plotly 圖表的大小
+        window.addEventListener('resize', function() {
+            const iframe = document.getElementById('global_iframe');
+            // 確保 iframe 有顯示出來才需要 resize
+            if (iframe && iframe.style.display !== 'none') {
+                try {
+                    const iframeWindow = iframe.contentWindow;
+                    if (iframeWindow.Plotly) {
+                        const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                        plotDivs.forEach(div => {
+                            iframeWindow.Plotly.Plots.resize(div);
+                        });
+                    }
+                } catch (e) {
+                    console.log('無法調整圖表大小:', e);
+                }
+            }
+        });
+
+        // 頁面載入完成後，預設載入「全部特徵」的全域解釋圖
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGlobal();
+        });
+    </script>
+</body>
+</html>

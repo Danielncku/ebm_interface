@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>IDH_Dashboard - 病人區域解釋圖</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background-color: #f5f6fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 標題 */
+        .header {
+            background: linear-gradient(135deg, #90abf0ff 0%, #768ad9ff 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .header-left h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .header-left p {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.3);
+            text-decoration: none;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* 主容器 - 左右分割 6:4 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 90px);
+            gap: 15px;
+            padding: 15px;
+        }
+
+        /* 左半邊 - 全域解釋 (60%) */
+        .left-section {
+            flex: 6;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ✅ 優化：密度視窗滑桿樣式 - 更緊湊 */
+        .slider-group {
+            margin-bottom: 15px;
+            padding: 12px 15px;
+            background: #BBDEFB;
+            border-radius: 8px;
+            border: 1px solid #c7d4c7ff;
+        }
+
+        .slider-group label {
+            font-weight: 600;
+            color: #0b407cff;
+            font-size: 0.9em;
+        }
+
+        /* ✅ 新增：控制區塊橫向排列 */
+        #density_controls {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .density-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .percentile-input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 2px solid #90CAF9;
+        }
+
+        .percentile-input-group label {
+            font-size: 0.85em;
+            color: #0b407cff;
+            white-space: nowrap;
+            min-width: 45px;
+        }
+
+        .percentile-input-group input {
+            flex: 1;
+            padding: 4px 6px;
+            border: 1px solid #d1e3d2ff;
+            border-radius: 4px;
+            font-size: 0.9em;
+            min-width: 50px;
+        }
+
+        .percentile-input-group span {
+            font-weight: 600;
+            color: #2E7D32;
+            font-size: 0.9em;
+        }
+
+        #apply_density {
+            padding: 8px 20px;
+            background: #5e94eaff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+
+        #apply_density:hover {
+            background: #4a7fc8;
+            transform: translateY(-1px);
+        }
+
+        .slider-group small {
+            color: #856404;
+            margin-top: 6px;
+            display: block;
+            font-size: 0.8em;
+        }
+
+        /* 右半邊 - 區域解釋 (40%) */
+        .right-section {
+            flex: 4;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ✅ 優化：顯示模式選擇器樣式 - 更扁平 */
+        .display-mode-group {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding: 10px 12px;
+            background: #BBDEFB;
+            border-radius: 6px;
+            border: 1px solid #90CAF9;
+        }
+
+        .display-mode-group label {
+            font-weight: 600;
+            color: #0b407cff;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .mode-btn {
+            padding: 8px 6px;
+            background: white;
+            border: 2px solid #90CAF9;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #335c85ff;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .mode-btn:hover {
+            background: #E3F2FD;
+            border-color: #42A5F5;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(33, 150, 243, 0.2);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #42A5F5 0%, #61adeeff 100%);
+            border-color: #1976D2;
+            color: white;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .mode-btn.active:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title-local {
+            border-bottom-color: #f5576c;
+        }
+
+        /* 選擇器樣式 */
+        .selector-group {
+            margin-bottom: 20px;
+        }
+
+        .selector-group label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .selector-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            background: white;
+            transition: border-color 0.3s;
+            cursor: pointer;
+        }
+
+        .selector-group select:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .selector-group select:hover {
+            border-color: #888;
+        }
+
+        .selector-group.patient-selector select:focus {
+            border-color: #f5576c;
+        }
+
+        /* 當前病人顯示 */
+        .current-patient {
+            background: #9eb4d3ff;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(240,147,251,0.3);
+        }
+
+        /* 圖表容器 */
+        .chart-container {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        .chart-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        /* 載入動畫 */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            font-size: 1.1em;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #949bb8ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        .spinner-local {
+            border-top-color: #f5576c;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 提示訊息 */
+        .info-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            color: #856404;
+            font-size: 0.9em;
+        }
+
+        /* AI 解釋按鈕（在左下角） */
+        .ai-explain-btn-container {
+            margin-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .ai-explain-btn {
+            padding: 12px 24px;
+            background: #61adeeff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .ai-explain-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+        }
+        
+        .ai-explain-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* AI 對話框遮罩 */
+        .ai-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* AI 對話框內容 */
+        .ai-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 1600px;
+            max-height: 120vh;
+            overflow: hidden;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translate(-50%, -40%);
+            }
+            to { 
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        /* 對話框標題 */
+        .ai-modal-header {
+            background: #667eea;
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .ai-modal-header h3 {
+            margin: 0;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ai-modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+        
+        .ai-modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* 對話框主體 */
+        .ai-modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        /* 內容網格佈局 */
+        .ai-content-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 25px;
+            align-items: start;
+        }
+        
+        /* 圖表容器 */
+        .ai-chart-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            height: 500px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .ai-chart-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+        
+        /* AI 解釋文字區域 */
+        .ai-explanation-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .ai-explanation-container h4 {
+            color: #667eea;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ai-explanation-text {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            line-height: 1.8;
+            color: #333;
+            font-size: 1em;
+        }
+        
+        .patient-value-badge {
+            background: #e3f2fd;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            border: 1px solid #90caf9;
+        }
+        
+        .patient-value-badge strong {
+            color: #1976d2;
+        }
+        
+        /* 載入動畫 */
+        .ai-loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .ai-loading .spinner {
+            width: 50px;
+            height: 50px;
+            border-width: 5px;
+            border-top-color: #667eea;
+            margin: 0 auto 20px;
+        }
+        
+        .ai-loading p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        /* 錯誤訊息 */
+        .ai-error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #e74c3c;
+        }
+        
+        .ai-error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .ai-error h4 {
+            margin: 15px 0;
+        }
+        
+        .ai-error-details {
+            background: #fee;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            text-align: left;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- 標題 -->
+    <div class="header">
+        <div class="header-left">
+            <h1>👤 IDH_Dashboard - 病人區域解釋圖</h1>
+            <p>個人化分析與特徵解釋</p>
+        </div>
+        <div class="nav-buttons">
+            <a href="{% url 'home' %}" class="nav-btn">🏠 返回首頁</a>
+        </div>
+    </div>
+
+    <!-- 主容器 - 左右分割 6:4 -->
+    <div class="main-container">
+        <!-- 左半邊 - 全域解釋 (60%) -->
+        <div class="left-section">
+            <h2 class="section-title">
+                <span>🌍</span>
+                <span>全域特徵解釋</span>
+            </h2>
+
+            <!-- ✅ 優化：密度視窗控制區塊 - 橫向排列 -->
+            <div class="slider-group">
+                <label style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="density_toggle" 
+                        style="width: 18px; height: 18px; cursor: pointer;">
+                    <span>📊 啟用百分位視窗（過濾極端值）</span>
+                </label>
+                <div id="density_controls">
+                    <div class="density-row">
+                        <div class="percentile-input-group">
+                            <label>下界：</label>
+                            <input type="number" id="lower_percentile" 
+                                min="0" max="50" value="2.5" step="0.5">
+                            <span>%</span>
+                        </div>
+                        <div class="percentile-input-group">
+                            <label>上界：</label>
+                            <input type="number" id="upper_percentile" 
+                                min="50" max="100" value="97.5" step="0.5">
+                            <span>%</span>
+                        </div>
+                        <button id="apply_density">套用範圍</button>
+                    </div>
+                </div>
+                <small>
+                    預設2.5% ~ 97.5%
+                </small>
+            </div>
+
+            <div class="selector-group">
+                <label for="feature_select">選擇特徵：</label>
+                <select id="feature_select">
+                    <option value="">全部特徵</option>
+                    {% for feature in feature_cols %}
+                        <option value="{{ feature }}">{{ feature }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="chart-container">
+                <div class="loading" id="global_loading">
+                    <div class="spinner"></div>
+                    <div>載入全域解釋圖表中...</div>
+                </div>
+                <iframe id="global_iframe" class="chart-iframe" style="display: none;"></iframe>
+            </div>
+            <!-- AI 解釋按鈕 -->
+            <div class="ai-explain-btn-container">
+                <button id="ai_explain_btn" class="ai-explain-btn" disabled>
+                    <span>智慧解釋</span>
+                </button>
+            </div>
+        </div> <!-- 左半邊結束 -->
+        
+ 
+        <!-- 右半邊 - 區域解釋 (40%) -->
+        <div class="right-section">
+            <h2 class="section-title section-title-local">
+                <span>🎯</span>
+                <span>區域解釋</span>
+            </h2>
+
+            <div class="current-patient">
+                目前分析：病人 <span id="current_patient_display">{{ patient_id }}</span>
+            </div>
+
+            <div class="selector-group patient-selector">
+                <label for="patient_select">切換病人：</label>
+                <select id="patient_select">
+                    {% for patient in patient_list %}
+                        <option value="{{ patient }}" {% if patient == patient_id %}selected{% endif %}>
+                            病人 {{ patient }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="chart-container">
+                <div class="loading" id="local_loading">
+                    <div class="spinner spinner-local"></div>
+                    <div>載入區域解釋圖表中...</div>
+                </div>
+                <iframe id="local_iframe" class="chart-iframe" style="display: none;"></iframe>
+            </div>
+
+            <!-- ✅ 優化：顯示模式選擇器 - 更扁平緊湊 -->
+            <div class="display-mode-group">
+                <label>📊 顯示模式：</label>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" data-mode="all">
+                        🔄 全部特徵
+                    </button>
+                    <button class="mode-btn" data-mode="positive">
+                        ❌危險特徵
+                    </button>
+                    <button class="mode-btn" data-mode="negative">
+                         ✅ 安全特徵
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPatient = "{{ patient_id }}";
+        let currentDisplayMode = 'all';
+
+        // ✅ 🆕 新增：密度視窗狀態變數
+        let densityEnabled = false;
+        let lowerPercentile = 2.5;
+        let upperPercentile = 97.5;
+
+        // ------------------------
+        // 全域解釋
+        // ------------------------
+        function loadGlobal(feature='') {
+            const loading = document.getElementById('global_loading');
+            const iframe = document.getElementById('global_iframe');
+            
+            loading.style.display = 'flex';
+            iframe.style.display = 'none';
+
+            // 🆕 修改：建構 URL 時加入密度視窗參數
+            let url = `/ajax/global_explanation/?feature=${encodeURIComponent(feature)}`;
+            if (densityEnabled) {
+                url += `&density_window=true&lower_percentile=${lowerPercentile}&upper_percentile=${upperPercentile}`;
+            }
+
+            fetch(url)
+                .then(res => res.text())
+                .then(html => {
+                    iframe.contentWindow.document.open();
+                    iframe.contentWindow.document.write(html);
+                    iframe.contentWindow.document.close();
+                    
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                    
+                    // 等待 iframe 完全載入後，觸發 Plotly 的 resize
+                    iframe.onload = function() {
+                        try {
+                            const iframeWindow = iframe.contentWindow;
+                            if (iframeWindow.Plotly) {
+                                const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                                plotDivs.forEach(div => {
+                                    iframeWindow.Plotly.Plots.resize(div);
+                                });
+                            }
+                        } catch (e) {
+                            console.log('無法調整 Plotly 圖表大小:', e);
+                        }
+                    };
+                })
+                .catch(error => {
+                    console.error('載入全域解釋圖表失敗:', error);
+                    loading.innerHTML = '<div class="spinner"></div><div style="color: red;">載入失敗，請稍後再試</div>';
+                });
+        }
+
+        // ✅ 🆕 新增：密度視窗控制事件監聽
+        const densityToggle = document.getElementById('density_toggle');
+        const densityControls = document.getElementById('density_controls');
+        const applyButton = document.getElementById('apply_density');
+
+        densityToggle.addEventListener('change', (e) => {
+            densityEnabled = e.target.checked;
+            densityControls.style.display = e.target.checked ? 'block' : 'none';
+            
+            if (!e.target.checked) {
+                // 關閉時重新載入完整資料
+                loadGlobal(document.getElementById('feature_select').value);
+            }
+        });
+
+        applyButton.addEventListener('click', () => {
+            lowerPercentile = parseFloat(document.getElementById('lower_percentile').value);
+            upperPercentile = parseFloat(document.getElementById('upper_percentile').value);
+            
+            // 驗證
+            if (lowerPercentile >= upperPercentile) {
+                alert('下界必須小於上界！');
+                return;
+            }
+            
+            loadGlobal(document.getElementById('feature_select').value);
+        });
+
+        // ------------------------
+        // 區域解釋
+        // ------------------------
+        function loadLocal(patientId, displayMode = 'all') {
+            const loading = document.getElementById('local_loading');
+            const iframe = document.getElementById('local_iframe');
+            const display = document.getElementById('current_patient_display');
+            
+            loading.style.display = 'flex';
+            iframe.style.display = 'none';
+
+            fetch(`/ajax/local_explanation/${patientId}/?display_mode=${displayMode}`)
+                .then(res => res.text())
+                .then(html => {
+                    iframe.contentWindow.document.open();
+                    iframe.contentWindow.document.write(html);
+                    iframe.contentWindow.document.close();
+                    
+                    // 更新顯示的病人ID
+                    display.textContent = patientId;
+                    currentPatient = patientId;
+                    
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                    
+                    // 等待 iframe 完全載入後，觸發 Plotly 的 resize
+                    iframe.onload = function() {
+                        try {
+                            const iframeWindow = iframe.contentWindow;
+                            if (iframeWindow.Plotly) {
+                                const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                                plotDivs.forEach(div => {
+                                    iframeWindow.Plotly.Plots.resize(div);
+                                });
+                            }
+                        } catch (e) {
+                            console.log('無法調整 Plotly 圖表大小:', e);
+                        }
+                    };
+                })
+                .catch(error => {
+                    console.error('載入區域解釋圖表失敗:', error);
+                    loading.innerHTML = '<div class="spinner spinner-local"></div><div style="color: red;">載入失敗，請稍後再試</div>';
+                });
+        }
+
+        // 🆕 新增：顯示模式按鈕事件監聽
+        document.addEventListener('DOMContentLoaded', function() {
+            const modeButtons = document.querySelectorAll('.mode-btn');
+            
+            modeButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // 移除所有按鈕的 active 狀態
+                    modeButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // 加入當前按鈕的 active 狀態
+                    this.classList.add('active');
+                    
+                    // 取得選擇的模式
+                    currentDisplayMode = this.getAttribute('data-mode');
+                    
+                    // 重新載入區域解釋圖
+                    loadLocal(currentPatient, currentDisplayMode);
+                });
+            });
+            
+            // 初始載入
+            loadGlobal('');
+            loadLocal(currentPatient, currentDisplayMode);
+        });
+        
+        // 當特徵選擇改變時更新全域解釋圖
+        document.getElementById('feature_select').addEventListener('change', (e) => {
+            loadGlobal(e.target.value);
+        });
+
+        // 當病人選擇改變時自動更新區域解釋圖
+        document.getElementById('patient_select').addEventListener('change', (e) => {
+            const selectedPatient = e.target.value;
+            if (selectedPatient !== currentPatient) {
+                loadLocal(selectedPatient, currentDisplayMode);
+                
+                // 可選：更新瀏覽器的URL（但不重新載入頁面）
+                window.history.pushState({}, '', `/dashboard/${selectedPatient}/`);
+            }
+        });
+
+        // 監聽視窗大小變化，自動調整圖表
+        window.addEventListener('resize', function() {
+            const globalIframe = document.getElementById('global_iframe');
+            const localIframe = document.getElementById('local_iframe');
+            
+            [globalIframe, localIframe].forEach(iframe => {
+                if (iframe && iframe.style.display !== 'none') {
+                    try {
+                        const iframeWindow = iframe.contentWindow;
+                        if (iframeWindow.Plotly) {
+                            const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                            plotDivs.forEach(div => {
+                                iframeWindow.Plotly.Plots.resize(div);
+                            });
+                        }
+                    } catch (e) {
+                        console.log('無法調整圖表大小:', e);
+                    }
+                }
+            });
+        });
+
+        // 頁面載入完成後載入圖表
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGlobal(); // 預設載入全部特徵的全域解釋
+            loadLocal(currentPatient, currentDisplayMode); // 載入當前病人的區域解釋
+        });
+
+
+        // 監聽特徵選擇，控制 AI 按鈕狀態
+        document.getElementById('feature_select').addEventListener('change', (e) => {
+            const aiBtn = document.getElementById('ai_explain_btn');
+            if (e.target.value) {
+                aiBtn.disabled = false;
+            } else {
+                aiBtn.disabled = true;
+            }
+            loadGlobal(e.target.value);
+        });
+        
+        // AI 按鈕點擊事件
+        document.getElementById('ai_explain_btn').addEventListener('click', function() {
+            const featureSelect = document.getElementById('feature_select');
+            const selectedFeature = featureSelect.value;
+            
+            if (!selectedFeature) {
+                alert('請先選擇一個特徵');
+                return;
+            }
+            
+            openAiModal(selectedFeature);
+        });
+        
+        // 開啟 AI 對話框
+        function openAiModal(featureName) {
+            const modal = document.getElementById('aiModal');
+            const modalTitle = document.getElementById('aiModalTitle');
+            const loading = document.getElementById('aiLoading');
+            const content = document.getElementById('aiContent');
+            const error = document.getElementById('aiError');
+            
+            // 更新標題
+            modalTitle.textContent = `${featureName} - AI 智慧解釋`;
+            
+            // 顯示對話框和載入狀態
+            modal.style.display = 'block';
+            loading.style.display = 'block';
+            content.style.display = 'none';
+            error.style.display = 'none';
+            
+            // 載入內容
+            loadAiExplanation(featureName);
+        }
+        
+        // 關閉 AI 對話框
+        function closeAiModal() {
+            document.getElementById('aiModal').style.display = 'none';
+        }
+        
+        // 點擊外部關閉
+        function closeAiModalOnOutside(event) {
+            if (event.target.id === 'aiModal') {
+                closeAiModal();
+            }
+        }
+        
+        // 載入 AI 解釋
+        async function loadAiExplanation(featureName) {
+            const loading = document.getElementById('aiLoading');
+            const content = document.getElementById('aiContent');
+            const error = document.getElementById('aiError');
+            const chartIframe = document.getElementById('aiChartIframe');
+            const explanationText = document.getElementById('aiExplanationText');
+            const patientValueDiv = document.getElementById('aiPatientValue');
+            
+            try {
+                // 1. 複製當前的全域解釋圖到對話框
+                const globalIframe = document.getElementById('global_iframe');
+                const globalHtml = globalIframe.contentWindow.document.documentElement.outerHTML;
+                
+                chartIframe.contentWindow.document.open();
+                chartIframe.contentWindow.document.write(globalHtml);
+                chartIframe.contentWindow.document.close();
+                
+                // 2. 請求 AI 解釋
+                const response = await fetch(
+                    `/ajax/ai_explain_feature/?feature=${encodeURIComponent(featureName)}&patient_id=${currentPatient}`
+                );
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 顯示病人數值（如果有）
+                    if (data.patient_value !== null) {
+                        patientValueDiv.innerHTML = `
+                            <div class="patient-value-badge">
+                                <strong>病人目前數值：</strong> ${data.patient_value.toFixed(2)}
+                            </div>
+                        `;
+                    } else {
+                        patientValueDiv.innerHTML = '';
+                    }
+                    
+                    // 顯示 AI 解釋
+                    explanationText.textContent = data.explanation;
+                    
+                    // 隱藏載入，顯示內容
+                    loading.style.display = 'none';
+                    content.style.display = 'grid';
+                    
+                    // 調整圖表大小
+                    setTimeout(() => {
+                        try {
+                            const iframeWindow = chartIframe.contentWindow;
+                            if (iframeWindow.Plotly) {
+                                const plotDivs = iframeWindow.document.querySelectorAll('.plotly-graph-div');
+                                plotDivs.forEach(div => {
+                                    iframeWindow.Plotly.Plots.resize(div);
+                                });
+                            }
+                        } catch (e) {
+                            console.log('無法調整圖表大小:', e);
+                        }
+                    }, 100);
+                    
+                } else {
+                    throw new Error(data.error || '未知錯誤');
+                }
+                
+            } catch (err) {
+                console.error('AI 解釋失敗:', err);
+                
+                // 顯示錯誤訊息
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                document.getElementById('aiErrorMessage').textContent = err.message;
+            }
+        }
+        
+        // ESC 鍵關閉對話框
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeAiModal();
+            }
+        });
+        
+        // 頁面載入完成後，檢查是否已選擇特徵
+        document.addEventListener('DOMContentLoaded', function() {
+            const featureSelect = document.getElementById('feature_select');
+            const aiBtn = document.getElementById('ai_explain_btn');
+            
+            if (featureSelect.value) {
+                aiBtn.disabled = false;
+            }
+        });
+    </script>
+
+
+
+    <!-- AI 解釋對話框 -->
+    <div id="aiModal" class="ai-modal" onclick="closeAiModalOnOutside(event)">
+        <div class="ai-modal-content">
+            <div class="ai-modal-header">
+                <h3>
+                    <span>🤖</span>
+                    <span id="aiModalTitle">AI 智慧解釋</span>
+                </h3>
+                <button class="ai-modal-close" onclick="closeAiModal()">&times;</button>
+            </div>
+            <div class="ai-modal-body" id="aiModalBody">
+                <!-- 載入中 -->
+                <div class="ai-loading" id="aiLoading">
+                    <div class="spinner"></div>
+                    <p>AI 正在分析中，請稍候...</p>
+                    <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
+                        首次使用可能需要 10-30 秒
+                    </p>
+                </div>
+                
+                <!-- 內容區域 -->
+                <div class="ai-content-grid" id="aiContent" style="display: none;">
+                    <!-- 左：圖表 -->
+                    <div class="ai-chart-container">
+                        <iframe id="aiChartIframe"></iframe>
+                    </div>
+                    
+                    <!-- 右：AI 解釋 -->
+                    <div class="ai-explanation-container">
+                        <h4>
+                            <span>💡</span>
+                            <span>AI解釋</span>
+                        </h4>
+                        <div id="aiPatientValue"></div>
+                        <div class="ai-explanation-text" id="aiExplanationText"></div>
+                    </div>
+                </div>
+                
+                <!-- 錯誤訊息 -->
+                <div class="ai-error" id="aiError" style="display: none;">
+                    <div class="ai-error-icon">❌</div>
+                    <h4>AI 解釋失敗</h4>
+                    <p id="aiErrorMessage"></p>
+                    <div class="ai-error-details">
+                        <strong>請檢查：</strong>
+                        <ul style="text-align: left; margin-top: 10px;">
+                            <li>TalkToEBM 套件是否已安裝</li>
+                            <li>LLM 服務是否正在運行</li>
+                            <li>網路連線是否正常</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
