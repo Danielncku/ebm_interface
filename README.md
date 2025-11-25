@@ -7,3 +7,7 @@ ebm_interface/
 ├── db.sqlite3 # 若有內建資料庫
 ├── manage.py # 如為 Django 專案
 └── talk_to_ebm.ipynb # Notebook 示範如何與模型互動
+
+(與fetch_api同層
+建立interface/data/temp.csv
+醫院開container ，改view.py讀檔程式， pip intall -r > requirements.txt下載相關套件後， python manage.py runserver
