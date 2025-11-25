@@ -33,7 +33,10 @@ feature_cols = ["Sex", "DM", "HTN", "CAD", "Age", "Pre_HD_SBP", "HR", "RR", "blo
                 "靜脈壓(mmHg)", "透析液壓(mmHg)", 'idh_count_last_28d']
 target_col = "Nadir90/100"
 
-ml_model = MLInterpretModel("EBM_28.joblib", "Patient5.csv", feature_cols, target_col)
+#patient data
+# ml_model = MLInterpretModel("EBM_28.joblib", "Patient5.csv", feature_cols, target_col)
+# API data
+ml_model = MLInterpretModel("EBM_28.joblib", "interface/data/temp.csv", feature_cols, target_col)
 
 # 首頁
 def home_view(request):
