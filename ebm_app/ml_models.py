@@ -3,22 +3,54 @@ import pandas as pd
 from plotly.offline import plot
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
+from scipy.stats import percentileofscore
 
 class MLInterpretModel:
     def __init__(self, model_path, data_path, feature_cols, target_col):
         self.model = joblib.load(model_path)
         self.data = pd.read_csv(data_path, encoding='utf-8-sig')
+        # file2_session.csv ID 欄位名稱不同，做統一處理
+        self.data = self.data.rename(columns={"Patient_ID": "ID"})
         self.feature_cols = feature_cols
         self.target_col = target_col
         
         # 統一將 ID 轉為字串
         self.data['ID'] = self.data['ID'].astype(str)
+        if "Sex" in self.data.columns:
+            self.data["Sex"] = (
+                self.data["Sex"]
+                .replace({
+                    "M": 1, "F": 0,
+                    "男": 1, "女": 0,
+                    "Male": 1, "Female": 0
+                })
+            )
+        
         
         # 儲存當前病人 ID 與特徵值
         self.current_patient_id = None
         self.current_patient_values = {}
     
     # ✅ 新增：計算局部梯度（平滑後求斜率）
+    
+    
+    
+    def get_patient_row(self, patient_id):
+        df = self.data
+        patient_id = str(patient_id)
+
+        rows = df[df["ID"].astype(str) == patient_id]
+
+        if rows.empty:
+            raise ValueError(f"❌ 找不到病人 ID: {patient_id}")
+
+        # 如果有紀錄時間 → 選最新的
+        if "紀錄時間" in df.columns:
+            rows = rows.sort_values("紀錄時間", ascending=False)
+
+        return rows.iloc[0]
+    
+    
     def calculate_local_gradient(self, x_values, y_values, patient_value, sigma=2):
         """
         計算病人值附近的局部梯度
@@ -164,12 +196,14 @@ class MLInterpretModel:
     # ----------------------------
     # 全域解釋（加入梯度分析）
     # ----------------------------
-    def get_global_explanation_html(self, feature=None, density_window=False, 
-                                lower_percentile=2.5, upper_percentile=97.5):
+    def get_global_explanation_html(self, feature=None, density_window=True, 
+                                lower_percentile=10, upper_percentile=90):
         try:
             import plotly.graph_objects as go
             import numpy as np
             ebm_global = self.model.explain_global()
+            
+            warning_message = None
             
             if feature and feature in self.feature_cols:
                 fig = ebm_global.visualize(self.feature_cols.index(feature))
@@ -185,6 +219,7 @@ class MLInterpretModel:
                             x_lower = np.percentile(x_vals, lower_percentile)
                             x_upper = np.percentile(x_vals, upper_percentile)
                             
+                            
                             # 過濾資料
                             mask = (x_vals >= x_lower) & (x_vals <= x_upper)
                             trace.x = x_vals[mask]
@@ -199,120 +234,181 @@ class MLInterpretModel:
                         x_vals = np.array(fig.data[0].x)
                         y_vals = np.array(fig.data[0].y)
                         
-                        # 計算局部梯度
-                        gradient, recommendation, y_smooth, x_sorted = self.calculate_local_gradient(
-                            x_vals, y_vals, patient_value, sigma=3
-                        )
-                        target_value, target_risk, risk_reduction = self.find_optimal_target(
-                            x_sorted, y_smooth, patient_value, recommendation
-                        )
+                        # ✅ 新增：計算完整資料的百分位數
+                        x_lower_bound = np.percentile(x_vals, lower_percentile)
+                        x_upper_bound = np.percentile(x_vals, upper_percentile)
+                        # ✅ 新增：檢查病人值是否在範圍內
+                        patient_in_range = (x_lower_bound <= patient_value <= x_upper_bound)
+                        percentile = percentileofscore(x_vals, patient_value)
+                        print(percentile)
                         
-                        
-                        # 準備建議文字和顏色
-                        if recommendation == 'decrease':
-                            arrow = "◀======== 建議降低"
-                            color = "#FF6B6B"
-                            annotation_pos = "top right"   # ⟸ 向左 → 文字放右
-                            if risk_reduction > 0:
-                                suggestion = f"降低至 {target_value:.2f} 可降低風險 {risk_reduction:.4f}"
-                            else:
-                                suggestion = f"降低此特徵可能降低風險"
-                        elif recommendation == 'increase':
-                            arrow = "========▶ 建議提高"
-                            color = "#FF6B6B"
-                            annotation_pos = "top left"    # ⟹ 向右 → 文字放左
-                            if risk_reduction > 0:
-                                suggestion = f"提高至 {target_value:.2f} 可降低風險 {risk_reduction:.4f}"
-                            else:
-                                suggestion = f"提高此特徵可能降低風險"
+                        if not patient_in_range:
+                            
+                            
+                            # 計算局部梯度（僅用於取得 y 值）
+                            gradient, recommendation, y_smooth, x_sorted = self.calculate_local_gradient(
+                                x_vals, y_vals, patient_value, sigma=3
+                            )
+                            
+                            # 找到最接近的 y 值
+                            idx = np.searchsorted(np.sort(x_vals), patient_value)
+                            if idx >= len(y_smooth):
+                                idx = len(y_smooth) - 1
+                            patient_y = y_smooth[idx]
+                            
+                            # 添加病人值標記線
+                            fig.add_vline(
+                                x=patient_value,
+                                line_dash="dash",
+                                line_color="#9E9E9E",  # 灰色
+                                line_width=3,
+                                annotation_text=f"病人值: {patient_value:.2f}<br>⚠️超出常見範圍，請諮詢臨床醫師",
+                                annotation_position="top right",
+                                annotation_font=dict(size=28, color="#F80505")
+                            )
+
+                            # 標記病人值點（灰色）
+                            fig.add_trace(go.Scatter(
+                                x=[patient_value],
+                                y=[patient_y],
+                                mode='markers',
+                                marker=dict(size=15, color="#9E9E9E", symbol='diamond', 
+                                          line=dict(width=2, color='white')),
+                                name='當前病人（範圍外）',
+                                showlegend=True,
+                                hovertemplate=(
+                                    f'<b>當前病人</b><br>'
+                                    f'特徵值: {patient_value:.2f}<br>'
+                                    f'貢獻度: {patient_y:.4f}<br>'
+                                    f'<b>⚠️ 數值超出常見範圍</b><br>'
+                                    f'<b>請諮詢專業臨床醫師</b><extra></extra>'
+                                )
+                            ))
                         else:
-                            arrow = "↔️ 維持現狀"
-                            color = "#FFA500"
-                            annotation_pos = "top left"
-                            suggestion = f"此特徵值處於平穩區域，無需調整"
-                        
-                        # 添加病人值標記線
-                        fig.add_vline(
-                            x=patient_value,
-                            line_dash="dash",
-                            line_color=color,
-                            line_width=3,
-                            annotation_text=f"病人值: {patient_value:.2f}<br>{arrow}",
-                            annotation_position=annotation_pos,
-                            annotation_font=dict(size=14, color=color)
-                        )
-
-                        # 標記病人值點
-                        # 找到最接近的 y 值
-                        idx = np.searchsorted(np.sort(x_vals), patient_value)
-                        if idx >= len(y_smooth):
-                            idx = len(y_smooth) - 1
-                        patient_y = y_smooth[idx]
-                        
-                        fig.add_trace(go.Scatter(
-                            x=[patient_value],
-                            y=[patient_y],
-                            mode='markers',
-                            marker=dict(size=15, color=color, symbol='diamond', 
-                                      line=dict(width=2, color='white')),
-                            name='當前病人',
-                            showlegend=True,
-                            hovertemplate=(
-                                f'<b>當前病人</b><br>'
-                                f'特徵值: {patient_value:.2f}<br>'
-                                f'貢獻度: {patient_y:.4f}<br>'
-                                f'局部梯度: {gradient:.4f}<br>'
-                                f'<b>{suggestion}</b><extra></extra>'
+                            # 計算局部梯度
+                            gradient, recommendation, y_smooth, x_sorted = self.calculate_local_gradient(
+                                x_vals, y_vals, patient_value, sigma=3
                             )
-                        ))
-                        # ✅ 顯示目標點
-                        fig.add_vline(
-                            x=target_value,
-                            line_dash="dot",
-                            line_color="#000000",
-                            line_width=2,
-                            annotation_text=f"目標值: {target_value:.2f}",
-                            annotation_position="bottom right",
-                            annotation_font=dict(size=14, color="#44C767")
-                        )
-
-                        # ✅ 在目標點加上 marker
-                        fig.add_trace(go.Scatter(
-                            x=[target_value],
-                            y=[target_risk],
-                            mode='markers+text',
-                            marker=dict(size=16, symbol='star', line=dict(width=2, color='white')),
-                            text=[f"⬇風險 {risk_reduction:.4f}"],
-                            textposition='bottom center',
-                            name='建議目標',
-                            showlegend=True,
-                            hovertemplate=(
-                                f'<b>建議目標</b><br>'
-                                f'特徵值: {target_value:.2f}<br>'
-                                f'預測風險: {target_risk:.4f}<br>'
-                                f'風險下降: {risk_reduction:.4f}<extra></extra>'
+                            target_value, target_risk, risk_reduction = self.find_optimal_target(
+                                x_sorted, y_smooth, patient_value, recommendation
                             )
-                        ))
+                            
+                            
+                            
+                            # 準備建議文字和顏色
+                            if recommendation == 'decrease':
+                                arrow = "◀======== 建議降低"
+                                color = "#FF6B6B"
+                                annotation_pos = "top left"   # ⟸ 向左 → 文字放右
+                                if risk_reduction > 0:
+                                    suggestion = f"降低至 {target_value:.2f} 可降低風險 {risk_reduction:.4f}"
+                                else:
+                                    suggestion = f"降低此特徵可能降低風險"
+                            elif recommendation == 'increase':
+                                arrow = "========▶ 建議提高"
+                                color = "#FF6B6B"
+                                annotation_pos = "top right"    # ⟹ 向右 → 文字放左
+                                if risk_reduction > 0:
+                                    suggestion = f"提高至 {target_value:.2f} 可降低風險 {risk_reduction:.4f}"
+                                else:
+                                    suggestion = f"提高此特徵可能降低風險"
+                            else:
+                                arrow = "↔️ 維持現狀"
+                                color = "#FFA500"
+                                annotation_pos = "top"
+                                suggestion = f"此特徵值處於平穩區域，無需調整"
+                            
+                            # 添加病人值標記線
+                            fig.add_vline(
+                                x=patient_value,
+                                line_dash="dash",
+                                line_color=color,
+                                line_width=3,
+                                annotation_text=f"病人值: {patient_value:.2f}<br>{arrow}",
+                                annotation_position=annotation_pos,
+                                annotation_font=dict(size=20, color=color)
+                            )
 
-                        
-                        # # 可選：顯示切線（視覺化梯度方向）
-                        # # 計算切線的起點和終點
-                        # x_range = np.max(x_vals) - np.min(x_vals)
-                        # tangent_length = x_range * 0.1  # 切線長度為範圍的 10%
-                        
-                        # x_tangent = [patient_value - tangent_length, patient_value + tangent_length]
-                        # y_tangent = [patient_y - gradient * tangent_length, 
-                        #            patient_y + gradient * tangent_length]
-                        
-                        # fig.add_trace(go.Scatter(
-                        #     x=x_tangent,
-                        #     y=y_tangent,
-                        #     mode='lines',
-                        #     line=dict(color=color, width=2, dash='dot'),
-                        #     name='局部趨勢',
-                        #     showlegend=True,
-                        #     hovertemplate=f'局部梯度: {gradient:.4f}<extra></extra>'
-                        # ))
+                            # 標記病人值點
+                            # 找到最接近的 y 值
+                            idx = np.searchsorted(np.sort(x_vals), patient_value)
+                            if idx >= len(y_smooth):
+                                idx = len(y_smooth) - 1
+                            patient_y = y_smooth[idx]
+                            
+                            fig.add_trace(go.Scatter(
+                                x=[patient_value],
+                                y=[patient_y],
+                                mode='markers',
+                                marker=dict(size=15, color=color, symbol='diamond', 
+                                        line=dict(width=2, color='white')),
+                                name='當前病人',
+                                showlegend=True,
+                                hovertemplate=(
+                                    f'<b>當前病人</b><br>'
+                                    f'特徵值: {patient_value:.2f}<br>'
+                                    f'貢獻度: {patient_y:.4f}<br>'
+                                    f'局部梯度: {gradient:.4f}<br>'
+                                    f'<b>{suggestion}</b><extra></extra>'
+                                )
+                            ))
+                            # ✅ 顯示目標點
+                            fig.add_vline(
+                                x=target_value,
+                                line_dash="dot",
+                                line_color="#000000",
+                                line_width=2,
+                                annotation_text=f"目標值: {target_value:.2f}",
+                                annotation_position="bottom right",
+                                annotation_font=dict(size=20, color="#44C767")
+                            )
+
+                            # ✅ 在目標點加上 marker
+                            fig.add_trace(go.Scatter(
+                                x=[target_value],
+                                y=[target_risk],
+                                mode='markers+text',
+                                marker=dict(
+                                    size=20,
+                                    symbol='star',
+                                    line=dict(width=2, color='white')
+                                ),
+                                text=[f"⬇風險 {risk_reduction:.4f}"],
+                                textposition='bottom center',
+
+                                # ⭐ 放大文字（例如 18）
+                                textfont=dict(size=18, color='black'),
+
+                                name='建議目標',
+                                showlegend=True,
+                                hovertemplate=(
+                                    f'<b>建議目標</b><br>'
+                                    f'特徵值: {target_value:.2f}<br>'
+                                    f'預測風險: {target_risk:.4f}<br>'
+                                    f'風險下降: {risk_reduction:.4f}<extra></extra>'
+                                )
+                            ))
+
+
+                            
+                            # # 可選：顯示切線（視覺化梯度方向）
+                            # # 計算切線的起點和終點
+                            # x_range = np.max(x_vals) - np.min(x_vals)
+                            # tangent_length = x_range * 0.1  # 切線長度為範圍的 10%
+                            
+                            # x_tangent = [patient_value - tangent_length, patient_value + tangent_length]
+                            # y_tangent = [patient_y - gradient * tangent_length, 
+                            #            patient_y + gradient * tangent_length]
+                            
+                            # fig.add_trace(go.Scatter(
+                            #     x=x_tangent,
+                            #     y=y_tangent,
+                            #     mode='lines',
+                            #     line=dict(color=color, width=2, dash='dot'),
+                            #     name='局部趨勢',
+                            #     showlegend=True,
+                            #     hovertemplate=f'局部梯度: {gradient:.4f}<extra></extra>'
+                            # ))
                     
             else:
                 fig = ebm_global.visualize()
@@ -582,3 +678,220 @@ class MLInterpretModel:
             </body>
             </html>
             """
+            
+    # ----------------------------
+    # 病人報告生成（整合 T2EBM）
+    # ----------------------------
+    def generate_patient_report(self, patient_id, llm=None, describe_graph_func=None):
+        """
+        生成病人報告內容，包含 T2EBM 的 LLM 解釋
+        
+        參數:
+            patient_id: 病人 ID
+            llm: T2EBM 的 LLM 物件（可選）
+            describe_graph_func: T2EBM 的 describe_graph 函數（可選）
+        
+        返回:
+            report_data: 包含所有報告資訊的字典
+        """
+        try:
+            patient_id = str(patient_id)
+            patient_df = self.data[self.data['ID'] == patient_id]
+            
+            if patient_df.empty:
+                return {"error": f"找不到病人 {patient_id}"}
+            
+            # 取得病人資料
+            patient_row = patient_df.iloc[0]
+            X_patient = patient_row[self.feature_cols].values.reshape(1, -1)
+            
+            # 預測風險
+            risk_proba = self.model.predict_proba(X_patient)[0][1]
+            risk_level = "高" if risk_proba > 0.7 else "中" if risk_proba > 0.4 else "低"
+            
+            # 取得區域解釋
+            ebm_local = self.model.explain_local(X_patient, None)
+            local_data = ebm_local.data(0)
+            
+            # 整理特徵貢獻
+            features_data = []
+            for name, score, value in zip(local_data['names'], local_data['scores'], local_data['values']):
+                if 'intercept' not in name.lower():
+                    features_data.append({
+                        'name': name,
+                        'value': value,
+                        'score': score,
+                        'is_risk': bool(score > 0)
+                    })
+            
+            # 排序（危險特徵在前）
+            features_data.sort(key=lambda x: abs(x['score']), reverse=True)
+            
+            # ✅ 如果有 LLM，生成 AI 解釋
+            ai_explanations = {}
+            top_risk_features = []
+            risk_features = [f for f in features_data if f["is_risk"]][:3]
+            total_effect = sum(abs(f["score"]) for f in risk_features) or 1.0
+            for feat in risk_features:
+                explanation = None
+
+                if llm and describe_graph_func:
+                    try:
+                        explanation = self._generate_feature_explanation_t2ebm(
+                            llm=llm,
+                            describe_graph_func=describe_graph_func,
+                            feature_name=feat["name"],
+                            patient_value=feat["value"],
+                            patient_id=patient_id
+                        )
+                    except Exception as e:
+                        print(f"AI 解釋失敗（{feat['name']}）:", e)
+                
+
+                # fallback（一定要有）
+                if not explanation:
+                    explanation = (
+                        f"根據模型，{feat['name']} 的目前數值 "
+                        f"對低血壓風險具有 {feat['score']:.3f} 的影響。"
+                    )
+                contribution_ratio = abs(feat["score"]) / total_effect
+
+                top_risk_features.append({
+                    "feature": feat["name"],
+                    "value": float(feat["value"]) if pd.notna(feat["value"]) else None,
+                    "model_effect": float(feat["score"]),
+                    "contribution_ratio": round(contribution_ratio, 3),  # 0~1
+                    "contribution_percent": round(contribution_ratio * 100, 1),  # %
+                    "ai_explanation": explanation
+                })
+                        
+            # 組合報告資料
+            report_data = {
+                'patient_id': patient_id,
+                'patient_info': {
+                    'sex': '男' if patient_row.get('Sex', 0) == 1 else '女',
+                    'age': int(patient_row.get('Age', 0)) if pd.notna(patient_row.get('Age')) else 'N/A',
+                    'dm': '是' if patient_row.get('DM', 0) == 1 else '否',
+                    'htn': '是' if patient_row.get('HTN', 0) == 1 else '否',
+                    'cad': '是' if patient_row.get('CAD', 0) == 1 else '否',
+                },
+                'risk_assessment': {
+                    'probability': float(risk_proba),
+                    'level': risk_level
+                },
+                "top_risk_features": top_risk_features
+            }
+            
+            return report_data
+            
+        except Exception as e:
+            import traceback
+            print(f"生成報告時發生錯誤: {e}")
+            traceback.print_exc()
+            return {"error": str(e)}
+    
+    def _generate_feature_explanation_t2ebm(self, llm, describe_graph_func, feature_name, patient_value, patient_id):
+        """
+        使用 T2EBM 生成單一特徵的解釋
+        """
+        try:
+            feature_idx = self.feature_cols.index(feature_name)
+            
+            # 1. 先生成全域圖表描述
+            print(f"正在生成 {feature_name} 的全域描述...")
+            global_desc = describe_graph_func(
+                llm,
+                self.model,
+                feature_index=feature_idx,
+                num_sentences=2,
+                max_chars=50,
+                style="technical",
+                temperature=0.0,
+                custom_prompt=(
+                    "ROLE: You are summarizing a model's global explanation curve.\n"
+                    "TASK: Describe ONLY the overall trend and shape of the curve.\n"
+                    "DO NOT:\n"
+                    "- Give clinical advice\n"
+                    "- Mention patient\n"
+                    "- Use speculative language\n"
+                    "- Use medical common sense\n"
+                    "FOCUS ON:\n"
+                    "- Whether risk increases or decreases\n"
+                    "- Whether there is a threshold or non-linear change\n"
+                    "- Overall direction of the curve\n"
+                )
+            )
+            
+            # 2. 計算病人的局部資訊
+            ebm_global = self.model.explain_global()
+            fig = ebm_global.visualize(feature_idx)
+            
+            x_vals = np.array(fig.data[0].x)
+            y_vals = np.array(fig.data[0].y)
+            
+            idx = (np.abs(x_vals - patient_value)).argmin()
+            effect = y_vals[idx]
+            
+            # 中央差分 slope
+            if 0 < idx < len(x_vals) - 1:
+                dy = y_vals[idx + 1] - y_vals[idx - 1]
+                dx = x_vals[idx + 1] - x_vals[idx - 1]
+                slope = dy / dx if dx != 0 else 0
+            else:
+                slope = 0
+            
+            threshold = 1e-4
+            if slope > threshold:
+                local_trend = "increasing"
+            elif slope < -threshold:
+                local_trend = "decreasing"
+            else:
+                local_trend = "stable"
+            
+            # 3. 組合 Prompt（臨床模式）
+            prompt = f"""
+                    ROLE: You are a nephrology clinician.
+
+                    GLOBAL MODEL CONTEXT (AUTHORITATIVE):
+                    {global_desc}
+
+                    TASK:
+                    Interpret the patient's feature value strictly according to the global model context above.
+
+                    INPUT (MODEL-DERIVED FACTS):
+                    - Feature: {feature_name}
+                    - Patient value: {patient_value:.2f}
+                    - Local model effect: {effect:.4f}
+                    - Local slope trend around this value: {local_trend}
+
+                    RULES:
+                    - Do NOT reinterpret or contradict the global model trend.
+                    - Base interpretation on the model, not general medical intuition.
+                    - Avoid causal claims; describe risk tendency only.
+                    - Keep it concise and clinically grounded.
+                    - MUST respond in Traditional Chinese (繁體中文)
+                    - Maximum 150 characters
+
+                    OUTPUT FORMAT (in Traditional Chinese):
+                    根據模型分析，此特徵值 [數值評估]，[風險影響說明]。[簡短建議]。
+                    """
+            
+            # 4. 呼叫 LLM
+            print(f"正在生成 {feature_name} 的病人解釋...")
+            response = llm.client.chat.completions.create(
+                model=llm.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            
+            explanation = response.choices[0].message.content.strip()
+            print(f"✅ {feature_name} 解釋生成完成: {explanation[:50]}...")
+            
+            return explanation
+            
+        except Exception as e:
+            print(f"T2EBM 解釋生成失敗: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"根據模型，{feature_name} = {patient_value:.2f}，對風險的貢獻度為 {effect:.4f}。"
+

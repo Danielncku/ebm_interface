@@ -5,6 +5,8 @@ from .ml_models import MLInterpretModel
 import os
 os.environ["OPENAI_BASE_URL"] = "http://192.168.63.184:11434/v1"
 os.environ["OPENAI_API_KEY"] = "ollama"
+
+
     
 try:
     from t2ebm.llm import openai_setup
@@ -27,16 +29,36 @@ except Exception as e:
     print(f"❌ TalkToEBM 初始化失敗（已禁用）: {e}")
     
 # 初始化模型
-feature_cols = ["Sex", "DM", "HTN", "CAD", "Age", "Pre_HD_SBP", "HR", "RR", "blood-speed",
-                "Dialysis-blood-temp", "Dialysis-blood-rate", "start-weight", "Mean_BP",
-                "HR_Mean_BP", "UF_BW_perc", "透析液 Ca", "體溫_New", "預估脫水量",
-                "靜脈壓(mmHg)", "透析液壓(mmHg)", 'idh_count_last_28d']
-target_col = "Nadir90/100"
+#feature_cols = ["Sex", "DM", "HTN", "CAD", "Age", "Pre_HD_SBP", "HR", "RR", "blood-speed",
+#                "Dialysis-blood-temp", "Dialysis-blood-rate", "start-weight", "Mean_BP",
+#                "HR_Mean_BP", "UF_BW_perc", "透析液 Ca", "體溫_New", "預估脫水量",
+#                "靜脈壓(mmHg)", "透析液壓(mmHg)", 'idh_count_last_28d']
+# target_col = "Nadir90/100"
 
-#patient data
-# ml_model = MLInterpretModel("EBM_28.joblib", "Patient5.csv", feature_cols, target_col)
-# API data
-ml_model = MLInterpretModel("EBM_28.joblib", "interface/data/temp.csv", feature_cols, target_col)
+feature_cols = ['Sex',
+    "Age",
+    "IDH_N_7D",
+    "IDH_N_28D",
+    "Pre_HD_SBP",
+    "Start_DBP",
+    "Heart_Rate",
+    "Respiratory_Rate",
+    "Body_Temperature",
+    "Pre_HD_Weight",
+    "Dry_Weight",
+    "Target_UF_Volume",
+    "UF_BW_Perc",
+    "Blood_Flow_Rate",
+    "Dialysate_Flow_Rate",
+    "Dialysate_Temperature"]
+target_col = "Nadir90/100"
+bin_cols = ["Sex"]
+cont_cols = list(set(feature_cols) - set(bin_cols))
+
+
+ml_model = MLInterpretModel("EBM_0921.joblib", "file2_Session.csv", feature_cols, target_col)
+# ml_model = MLInterpretModel("EBM_28.joblib", "interface/data/temp.csv", feature_cols, target_col)
+
 
 # 首頁
 def home_view(request):
@@ -88,9 +110,7 @@ def ajax_local_explanation(request, patient_id):
     return HttpResponse(html)
 
 
-# ============================================
-# ✅ 加在 views.py 的最底部
-# ============================================
+
 
 def ajax_ai_explain_feature(request):
     """
@@ -174,3 +194,64 @@ def ajax_ai_explain_feature(request):
             'success': False,
             'error': str(e)
         })
+        
+def generate_patient_report_api(request, patient_id):
+    """
+    生成病人報告的 API
+    支援兩種模式：
+    1. 不使用 LLM：返回基本報告資料
+    2. 使用 LLM：包含 T2EBM AI 解釋
+    """
+    try:
+        # 檢查是否要使用 LLM
+        use_llm = request.GET.get('use_llm', 'false').lower() == 'true'
+        
+        if use_llm and TALK_TO_EBM_AVAILABLE:
+            # 使用 T2EBM 生成 AI 解釋
+            print(f"📝 開始生成病人 {patient_id} 的報告（包含 AI 解釋）...")
+            report_data = ml_model.generate_patient_report(
+                patient_id=patient_id,
+                llm=llm,
+                describe_graph_func=describe_graph
+            )
+            print(f"✅ 報告生成完成")
+        else:
+            # 不使用 LLM，只返回基本資料
+            if use_llm and not TALK_TO_EBM_AVAILABLE:
+                print("⚠️ 使用者請求 AI 解釋，但 TalkToEBM 不可用")
+            
+            print(f"📝 開始生成病人 {patient_id} 的基本報告...")
+            report_data = ml_model.generate_patient_report(
+                patient_id=patient_id,
+                llm=None,
+                describe_graph_func=None
+            )
+            print(f"✅ 基本報告生成完成")
+        
+        if 'error' in report_data:
+            return JsonResponse(report_data, status=404)
+        
+        return JsonResponse(report_data, safe=False, json_dumps_params={'ensure_ascii': False})
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ 報告生成失敗: {e}")
+        print(error_trace)
+        return JsonResponse({
+            'error': str(e),
+            'traceback': error_trace
+        }, status=500)
+
+
+def patient_report_view(request, patient_id):
+    """
+    顯示病人報告頁面
+    """
+    data = ml_model.data
+    patient_list = data['ID'].unique().tolist()
+    
+    return render(request, 'ebm_app/patient_report.html', {
+        'patient_id': patient_id,
+        'patient_list': patient_list
+    })

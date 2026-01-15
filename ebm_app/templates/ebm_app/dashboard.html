@@ -80,7 +80,7 @@
             flex-direction: column;
         }
 
-        /* ✅ 優化：密度視窗滑桿樣式 - 更緊湊 */
+        /* 密度視窗滑桿樣式 */
         .slider-group {
             margin-bottom: 15px;
             padding: 12px 15px;
@@ -95,7 +95,6 @@
             font-size: 0.9em;
         }
 
-        /* ✅ 新增：控制區塊橫向排列 */
         #density_controls {
             margin-top: 10px;
             display: none;
@@ -176,38 +175,69 @@
             flex-direction: column;
         }
 
-        /* ✅ 優化：顯示模式選擇器樣式 - 更扁平 */
-        .display-mode-group {
-            margin-top: 10px;
-            margin-bottom: 10px;
-            padding: 10px 12px;
-            background: #BBDEFB;
-            border-radius: 6px;
-            border: 1px solid #90CAF9;
+        /* ✅ 修改1：優化病人選擇器樣式（包含嵌入按鈕區域） */
+        .patient-selector {
+            margin-bottom: 20px;
+            padding: 15px;
+            padding-bottom: 60px; /* 為下方按鈕預留空間 */
+            background: linear-gradient(135deg, #9eb4d3ff 0%, #8ba3c7ff 100%);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(158, 180, 211, 0.3);
+            position: relative;
         }
 
-        .display-mode-group label {
+        .patient-selector label {
             font-weight: 600;
-            color: #0b407cff;
+            color: white;
             display: block;
-            margin-bottom: 8px;
-            font-size: 0.9em;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .patient-selector select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid white;
+            border-radius: 8px;
+            font-size: 1.05em;
+            font-weight: 600;
+            background: white;
+            color: #0b407cff;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .patient-selector select:focus {
+            border-color: #f5576c;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.2);
+        }
+
+        .patient-selector select:hover {
+            border-color: #f5576c;
+        }
+
+        /* ✅ 修改2：顯示模式按鈕移到選擇器左下角 */
+        .display-mode-group {
+            position: absolute;
+            bottom: 10px;
+            left: 15px;
+            z-index: 100;
         }
 
         .mode-buttons {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            display: flex;
             gap: 6px;
         }
 
         .mode-btn {
-            padding: 8px 6px;
+            padding: 6px 12px;
             background: white;
             border: 2px solid #90CAF9;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 0.85em;
+            font-size: 0.8em;
             color: #335c85ff;
             transition: all 0.3s;
             white-space: nowrap;
@@ -279,23 +309,6 @@
             border-color: #888;
         }
 
-        .selector-group.patient-selector select:focus {
-            border-color: #f5576c;
-        }
-
-        /* 當前病人顯示 */
-        .current-patient {
-            background: #9eb4d3ff;
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(240,147,251,0.3);
-        }
-
         /* 圖表容器 */
         .chart-container {
             flex: 1;
@@ -351,7 +364,65 @@
             font-size: 0.9em;
         }
 
-        /* AI 解釋按鈕（在左下角） */
+        /* 生成報告書按鈕樣式（移到選擇器右下角） */
+        .report-button {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            padding: 6px 15px;
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        .report-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+            background: #44aed8;
+        }
+
+        .report-button:active {
+            transform: translateY(0px);
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+        }
+
+        .report-icon {
+            font-size: 1em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .report-button.loading {
+            background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%);
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .report-button.loading .report-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        /* AI 解釋按鈕 */
         .ai-explain-btn-container {
             margin-top: 15px;
             display: flex;
@@ -587,6 +658,19 @@
             text-align: left;
             color: #666;
         }
+
+        /* 報告結果顯示區 */
+        #report_result {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #90CAF9;
+            max-height: 300px;
+            overflow: auto;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -610,11 +694,12 @@
                 <span>全域特徵解釋</span>
             </h2>
 
-            <!-- ✅ 優化：密度視窗控制區塊 - 橫向排列 -->
+            <!-- 密度視窗控制區塊 -->
             <div class="slider-group">
                 <label style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="density_toggle" 
-                        style="width: 18px; height: 18px; cursor: pointer;">
+                        style="width: 18px; height: 18px; cursor: pointer;"
+                        checked>
                     <span>📊 啟用百分位視窗（過濾極端值）</span>
                 </label>
                 <div id="density_controls">
@@ -622,20 +707,20 @@
                         <div class="percentile-input-group">
                             <label>下界：</label>
                             <input type="number" id="lower_percentile" 
-                                min="0" max="50" value="2.5" step="0.5">
+                                min="0" max="50" value="10" step="0.5">
                             <span>%</span>
                         </div>
                         <div class="percentile-input-group">
                             <label>上界：</label>
                             <input type="number" id="upper_percentile" 
-                                min="50" max="100" value="97.5" step="0.5">
+                                min="50" max="100" value="90" step="0.5">
                             <span>%</span>
                         </div>
                         <button id="apply_density">套用範圍</button>
                     </div>
                 </div>
                 <small>
-                    預設2.5% ~ 97.5%
+                    💡預設10% ~ 90%
                 </small>
             </div>
 
@@ -658,12 +743,11 @@
             <!-- AI 解釋按鈕 -->
             <div class="ai-explain-btn-container">
                 <button id="ai_explain_btn" class="ai-explain-btn" disabled>
-                    <span>智慧解釋</span>
+                    <span>🤖 智慧解釋</span>
                 </button>
             </div>
-        </div> <!-- 左半邊結束 -->
+        </div>
         
- 
         <!-- 右半邊 - 區域解釋 (40%) -->
         <div class="right-section">
             <h2 class="section-title section-title-local">
@@ -671,12 +755,9 @@
                 <span>區域解釋</span>
             </h2>
 
-            <div class="current-patient">
-                目前分析：病人 <span id="current_patient_display">{{ patient_id }}</span>
-            </div>
-
+            <!-- ✅ 修改1：病人選擇器（包含嵌入的按鈕） -->
             <div class="selector-group patient-selector">
-                <label for="patient_select">切換病人：</label>
+                <label for="patient_select">👤 選擇病人：</label>
                 <select id="patient_select">
                     {% for patient in patient_list %}
                         <option value="{{ patient }}" {% if patient == patient_id %}selected{% endif %}>
@@ -684,30 +765,40 @@
                         </option>
                     {% endfor %}
                 </select>
+                
+                <!-- 顯示模式按鈕（左下角） -->
+                <div class="display-mode-group">
+                    <div class="mode-buttons">
+                        <button class="mode-btn active" data-mode="all">
+                            🔄 全部
+                        </button>
+                        <button class="mode-btn" data-mode="positive">
+                            ❌ 危險
+                        </button>
+                        <button class="mode-btn" data-mode="negative">
+                            ✅ 安全
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 生成報告按鈕（右下角） -->
+                <button id="generate_report" class="report-button">
+                    <span class="report-icon">📋</span>
+                    <span>病人報告書</span>
+                </button>
             </div>
 
+            <!-- 報告結果顯示區 -->
+            <div id="report_result"></div>
+
+            <!-- ✅ 修改2：圖表容器（移除嵌入按鈕） -->
             <div class="chart-container">
+                <!-- 載入動畫和圖表 -->
                 <div class="loading" id="local_loading">
                     <div class="spinner spinner-local"></div>
                     <div>載入區域解釋圖表中...</div>
                 </div>
                 <iframe id="local_iframe" class="chart-iframe" style="display: none;"></iframe>
-            </div>
-
-            <!-- ✅ 優化：顯示模式選擇器 - 更扁平緊湊 -->
-            <div class="display-mode-group">
-                <label>📊 顯示模式：</label>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" data-mode="all">
-                        🔄 全部特徵
-                    </button>
-                    <button class="mode-btn" data-mode="positive">
-                        ❌危險特徵
-                    </button>
-                    <button class="mode-btn" data-mode="negative">
-                         ✅ 安全特徵
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -716,10 +807,10 @@
         let currentPatient = "{{ patient_id }}";
         let currentDisplayMode = 'all';
 
-        // ✅ 🆕 新增：密度視窗狀態變數
-        let densityEnabled = false;
-        let lowerPercentile = 2.5;
-        let upperPercentile = 97.5;
+        // 密度視窗狀態變數
+        let densityEnabled = true;
+        let lowerPercentile = 10;
+        let upperPercentile = 90;
 
         // ------------------------
         // 全域解釋
@@ -731,7 +822,6 @@
             loading.style.display = 'flex';
             iframe.style.display = 'none';
 
-            // 🆕 修改：建構 URL 時加入密度視窗參數
             let url = `/ajax/global_explanation/?feature=${encodeURIComponent(feature)}`;
             if (densityEnabled) {
                 url += `&density_window=true&lower_percentile=${lowerPercentile}&upper_percentile=${upperPercentile}`;
@@ -747,7 +837,6 @@
                     loading.style.display = 'none';
                     iframe.style.display = 'block';
                     
-                    // 等待 iframe 完全載入後，觸發 Plotly 的 resize
                     iframe.onload = function() {
                         try {
                             const iframeWindow = iframe.contentWindow;
@@ -768,7 +857,7 @@
                 });
         }
 
-        // ✅ 🆕 新增：密度視窗控制事件監聽
+        // 密度視窗控制事件監聽
         const densityToggle = document.getElementById('density_toggle');
         const densityControls = document.getElementById('density_controls');
         const applyButton = document.getElementById('apply_density');
@@ -778,7 +867,6 @@
             densityControls.style.display = e.target.checked ? 'block' : 'none';
             
             if (!e.target.checked) {
-                // 關閉時重新載入完整資料
                 loadGlobal(document.getElementById('feature_select').value);
             }
         });
@@ -787,7 +875,6 @@
             lowerPercentile = parseFloat(document.getElementById('lower_percentile').value);
             upperPercentile = parseFloat(document.getElementById('upper_percentile').value);
             
-            // 驗證
             if (lowerPercentile >= upperPercentile) {
                 alert('下界必須小於上界！');
                 return;
@@ -802,7 +889,6 @@
         function loadLocal(patientId, displayMode = 'all') {
             const loading = document.getElementById('local_loading');
             const iframe = document.getElementById('local_iframe');
-            const display = document.getElementById('current_patient_display');
             
             loading.style.display = 'flex';
             iframe.style.display = 'none';
@@ -814,14 +900,11 @@
                     iframe.contentWindow.document.write(html);
                     iframe.contentWindow.document.close();
                     
-                    // 更新顯示的病人ID
-                    display.textContent = patientId;
                     currentPatient = patientId;
                     
                     loading.style.display = 'none';
                     iframe.style.display = 'block';
                     
-                    // 等待 iframe 完全載入後，觸發 Plotly 的 resize
                     iframe.onload = function() {
                         try {
                             const iframeWindow = iframe.contentWindow;
@@ -842,22 +925,16 @@
                 });
         }
 
-        // 🆕 新增：顯示模式按鈕事件監聽
+        // 頁面載入完成後的初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 顯示模式按鈕事件監聽
             const modeButtons = document.querySelectorAll('.mode-btn');
             
             modeButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    // 移除所有按鈕的 active 狀態
                     modeButtons.forEach(btn => btn.classList.remove('active'));
-                    
-                    // 加入當前按鈕的 active 狀態
                     this.classList.add('active');
-                    
-                    // 取得選擇的模式
                     currentDisplayMode = this.getAttribute('data-mode');
-                    
-                    // 重新載入區域解釋圖
                     loadLocal(currentPatient, currentDisplayMode);
                 });
             });
@@ -865,10 +942,59 @@
             // 初始載入
             loadGlobal('');
             loadLocal(currentPatient, currentDisplayMode);
+
+            // 生成報告按鈕
+            const reportBtn = document.getElementById('generate_report');
+            const reportDiv = document.getElementById('report_result');
+
+            if (reportBtn && reportDiv) {
+                reportBtn.addEventListener('click', async function () {
+                    const button = this;
+                    const originalHTML = button.innerHTML;
+
+                    button.classList.add('loading');
+                    button.innerHTML = '<span class="report-icon">⏳</span><span>生成報告中...</span>';
+                    reportDiv.style.display = 'none';
+                    reportDiv.innerHTML = '';
+
+                    try {
+                        const response = await fetch(
+                            `/api/generate_patient_report/${currentPatient}/?use_llm=true`
+                        );
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+
+                        const reportData = await response.json();
+
+                        if (reportData.error) {
+                            throw new Error(reportData.error);
+                        }
+
+                        reportDiv.style.display = 'block';
+                        reportDiv.innerHTML =
+                            '<h4>📋 病人報告（JSON）</h4>' +
+                            '<pre>' + JSON.stringify(reportData, null, 2) + '</pre>';
+
+                    } catch (err) {
+                        alert('報告生成失敗：' + err.message);
+                    } finally {
+                        button.classList.remove('loading');
+                        button.innerHTML = originalHTML;
+                    }
+                });
+            }
         });
         
         // 當特徵選擇改變時更新全域解釋圖
         document.getElementById('feature_select').addEventListener('change', (e) => {
+            const aiBtn = document.getElementById('ai_explain_btn');
+            if (e.target.value) {
+                aiBtn.disabled = false;
+            } else {
+                aiBtn.disabled = true;
+            }
             loadGlobal(e.target.value);
         });
 
@@ -877,8 +1003,6 @@
             const selectedPatient = e.target.value;
             if (selectedPatient !== currentPatient) {
                 loadLocal(selectedPatient, currentDisplayMode);
-                
-                // 可選：更新瀏覽器的URL（但不重新載入頁面）
                 window.history.pushState({}, '', `/dashboard/${selectedPatient}/`);
             }
         });
@@ -905,24 +1029,6 @@
             });
         });
 
-        // 頁面載入完成後載入圖表
-        document.addEventListener('DOMContentLoaded', function() {
-            loadGlobal(); // 預設載入全部特徵的全域解釋
-            loadLocal(currentPatient, currentDisplayMode); // 載入當前病人的區域解釋
-        });
-
-
-        // 監聽特徵選擇，控制 AI 按鈕狀態
-        document.getElementById('feature_select').addEventListener('change', (e) => {
-            const aiBtn = document.getElementById('ai_explain_btn');
-            if (e.target.value) {
-                aiBtn.disabled = false;
-            } else {
-                aiBtn.disabled = true;
-            }
-            loadGlobal(e.target.value);
-        });
-        
         // AI 按鈕點擊事件
         document.getElementById('ai_explain_btn').addEventListener('click', function() {
             const featureSelect = document.getElementById('feature_select');
@@ -944,16 +1050,13 @@
             const content = document.getElementById('aiContent');
             const error = document.getElementById('aiError');
             
-            // 更新標題
             modalTitle.textContent = `${featureName} - AI 智慧解釋`;
             
-            // 顯示對話框和載入狀態
             modal.style.display = 'block';
             loading.style.display = 'block';
             content.style.display = 'none';
             error.style.display = 'none';
             
-            // 載入內容
             loadAiExplanation(featureName);
         }
         
@@ -979,7 +1082,6 @@
             const patientValueDiv = document.getElementById('aiPatientValue');
             
             try {
-                // 1. 複製當前的全域解釋圖到對話框
                 const globalIframe = document.getElementById('global_iframe');
                 const globalHtml = globalIframe.contentWindow.document.documentElement.outerHTML;
                 
@@ -987,7 +1089,6 @@
                 chartIframe.contentWindow.document.write(globalHtml);
                 chartIframe.contentWindow.document.close();
                 
-                // 2. 請求 AI 解釋
                 const response = await fetch(
                     `/ajax/ai_explain_feature/?feature=${encodeURIComponent(featureName)}&patient_id=${currentPatient}`
                 );
@@ -999,7 +1100,6 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // 顯示病人數值（如果有）
                     if (data.patient_value !== null) {
                         patientValueDiv.innerHTML = `
                             <div class="patient-value-badge">
@@ -1010,14 +1110,11 @@
                         patientValueDiv.innerHTML = '';
                     }
                     
-                    // 顯示 AI 解釋
                     explanationText.textContent = data.explanation;
                     
-                    // 隱藏載入，顯示內容
                     loading.style.display = 'none';
                     content.style.display = 'grid';
                     
-                    // 調整圖表大小
                     setTimeout(() => {
                         try {
                             const iframeWindow = chartIframe.contentWindow;
@@ -1039,7 +1136,6 @@
             } catch (err) {
                 console.error('AI 解釋失敗:', err);
                 
-                // 顯示錯誤訊息
                 loading.style.display = 'none';
                 error.style.display = 'block';
                 document.getElementById('aiErrorMessage').textContent = err.message;
@@ -1052,19 +1148,7 @@
                 closeAiModal();
             }
         });
-        
-        // 頁面載入完成後，檢查是否已選擇特徵
-        document.addEventListener('DOMContentLoaded', function() {
-            const featureSelect = document.getElementById('feature_select');
-            const aiBtn = document.getElementById('ai_explain_btn');
-            
-            if (featureSelect.value) {
-                aiBtn.disabled = false;
-            }
-        });
     </script>
-
-
 
     <!-- AI 解釋對話框 -->
     <div id="aiModal" class="ai-modal" onclick="closeAiModalOnOutside(event)">
